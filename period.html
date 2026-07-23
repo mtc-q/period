@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Period — notes filed by the clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PERIOD — design tokens
+   Ground: cool graph-paper grey-blue. Class colours carry the
+   chroma, so the app's own palette stays quiet. Magenta is
+   reserved for one thing only: NOW.
+   ============================================================ */
+:root{
+  --paper:#E9EDF0;
+  --surface:#FFFFFF;
+  --surface-2:#F4F7F9;
+  --ink:#16202B;
+  --ink-soft:#5A6B7A;
+  --ink-faint:#8C9AA6;
+  --rule:#CBD6DE;
+  --rule-soft:#E1E8ED;
+  --signal:#E0006C;
+  --signal-wash:rgba(224,0,108,.10);
+
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --r:10px;
+  --shadow:0 1px 2px rgba(22,32,43,.06), 0 8px 24px -12px rgba(22,32,43,.18);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  /* graph paper */
+  background-image:
+    linear-gradient(var(--rule-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+  background-size:26px 26px;
+  color:var(--ink);
+  font-family:var(--display);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:18px 16px 64px}
+
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2.5px solid var(--signal);outline-offset:2px;border-radius:4px}
+
+.eyebrow{
+  font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- header ---------- */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{
+  font-size:30px;font-weight:800;letter-spacing:-.03em;margin:0;line-height:1;
+}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--signal);display:inline-block;transform:translateY(-2px)}
+.brand p{margin:0;font-size:12.5px;color:var(--ink-soft)}
+
+.clockbox{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.clockbox .now{
+  font-family:var(--mono);font-size:20px;font-weight:600;letter-spacing:-.02em;
+}
+.chip-btn{
+  background:var(--surface);border:1px solid var(--rule);border-radius:999px;
+  padding:5px 11px;font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-soft);
+}
+.chip-btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.simfields{display:none;gap:6px;align-items:center}
+.simfields.on{display:flex}
+
+/* ---------- SIGNATURE: today's ribbon ---------- */
+.ribbon-card{
+  background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:16px 18px 14px;margin-bottom:16px;
+}
+.ribbon-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
+.ribbon{
+  position:relative;height:56px;border-radius:6px;background:var(--surface-2);
+  border:1px solid var(--rule-soft);overflow:hidden;
+}
+.blk{
+  position:absolute;top:0;bottom:0;border-radius:5px;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:center;padding:0 9px;
+  color:#fff;
+}
+.blk .n{font-size:11.5px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blk .t{font-family:var(--mono);font-size:9.5px;opacity:.82;white-space:nowrap}
+.blk.brk{
+  color:var(--ink-soft);
+  background-image:repeating-linear-gradient(45deg,var(--rule-soft) 0 6px,transparent 6px 12px);
+  background-color:var(--surface);
+  border:1px dashed var(--rule);
+}
+.playhead{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--signal);z-index:5}
+.playhead::before{
+  content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:9px;height:9px;border-radius:50%;background:var(--signal);
+}
+.playhead::after{
+  content:"";position:absolute;inset:-2px -7px;background:var(--signal);opacity:.14;
+}
+.ribbon-axis{display:flex;justify-content:space-between;margin-top:6px;font-size:9.5px;color:var(--ink-faint)}
+.swatch{width:12px;height:12px;border-radius:3px;flex:none;display:inline-block}
+.verdict{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px}
+.verdict strong{font-weight:800;letter-spacing:-.01em}
+.verdict .sub{color:var(--ink-soft);font-size:12.5px}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule);margin-bottom:18px}
+.tab{
+  background:none;border:0;border-bottom:2.5px solid transparent;
+  padding:9px 14px;margin-bottom:-1px;
+  font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);
+}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--signal)}
+.panel[hidden]{display:none}
+@media (prefers-reduced-motion:no-preference){
+  .panel{animation:rise .22s ease}
+  @keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+}
+
+/* ---------- cards & forms ---------- */
+.card{
+  background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:18px;margin-bottom:16px;
+}
+.card > .eyebrow{display:block;margin-bottom:12px}
+label.f{display:block;margin-bottom:10px}
+label.f > span{display:block;font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px}
+input[type=text],input[type=time],select,textarea{
+  width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:7px;
+  padding:8px 10px;font-size:14px;
+}
+input[type=time],select{font-family:var(--mono);font-size:13px}
+textarea{font-family:var(--body);font-size:17px;line-height:1.6;min-height:190px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row > *{flex:1 1 140px;min-width:0}
+.row > .tight{flex:0 0 auto}
+
+.btn{
+  background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:7px;
+  padding:9px 16px;font-size:13px;font-weight:700;letter-spacing:.01em;
+}
+.btn:hover{background:#233444}
+.btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--rule)}
+.btn.ghost:hover{background:var(--surface-2)}
+.btn.sig{background:var(--signal);border-color:var(--signal)}
+.btn.sig:hover{filter:brightness(1.08)}
+.btn.sm{padding:5px 10px;font-size:11.5px}
+.btn.danger{color:#B4123F;border-color:var(--rule);background:var(--surface)}
+
+/* ---------- capture ---------- */
+.modes{display:inline-flex;background:var(--surface-2);border:1px solid var(--rule);border-radius:999px;padding:3px;margin-bottom:16px}
+.modes button{
+  background:none;border:0;border-radius:999px;padding:7px 18px;
+  font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+}
+.modes button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+#pad{
+  width:100%;height:auto;display:block;background:var(--surface);
+  border:1px solid var(--rule);border-radius:7px;touch-action:none;cursor:crosshair;
+  background-image:linear-gradient(var(--rule-soft) 1px,transparent 1px);
+  background-size:100% 30px;
+}
+.pentools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.inks{display:flex;gap:5px}
+.ink{width:24px;height:24px;border-radius:50%;border:2px solid transparent;padding:0}
+.ink[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--surface)}
+input[type=range]{flex:0 0 96px;accent-color:var(--signal)}
+
+.dropzone{
+  border:1.5px dashed var(--rule);border-radius:7px;background:var(--surface-2);
+  padding:34px 20px;text-align:center;color:var(--ink-soft);
+}
+.dropzone p{margin:8px 0 14px;font-size:13px}
+#shotPrev{max-width:100%;max-height:420px;border-radius:7px;border:1px solid var(--rule);display:block}
+
+.filebar{
+  margin-top:16px;padding:14px;border-radius:7px;background:var(--surface-2);
+  border:1px solid var(--rule-soft);border-left:3px solid var(--signal);
+  display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;
+}
+.filebar .grow{flex:1 1 220px;min-width:0}
+.filebar .dest{font-size:15px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.filebar .why{font-size:11.5px;color:var(--ink-soft);margin-top:2px}
+
+/* ---------- notebook ---------- */
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 18px}
+.fchip{
+  border:1px solid var(--rule);background:var(--surface);border-radius:999px;
+  padding:5px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;
+}
+.fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.fchip .swatch{width:8px;height:8px;border-radius:50%;flex:none}
+
+.group-h{display:flex;align-items:center;gap:9px;margin:22px 0 10px}
+.group-h .swatch{width:11px;height:11px;border-radius:3px;flex:none}
+.group-h h3{margin:0;font-size:14px;font-weight:800;letter-spacing:-.01em}
+.group-h .count{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.group-h hr{flex:1;border:0;border-top:1px solid var(--rule)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px}
+.item{
+  background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+  overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;
+}
+.item .stripe{height:3px}
+.item .body{padding:12px 13px;flex:1}
+.item h4{margin:0 0 5px;font-size:14px;font-weight:800;letter-spacing:-.01em}
+.item .excerpt{font-family:var(--body);font-size:14px;color:var(--ink-soft);margin:0;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.item img{width:100%;height:132px;object-fit:cover;display:block;background:var(--surface-2)}
+.item .meta{padding:9px 13px;border-top:1px solid var(--rule-soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item .meta .mono{font-size:11px;color:var(--ink-faint)}
+.item .meta select{flex:1;min-width:110px;padding:4px 6px;font-size:11px}
+.tag{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.tag.moved{color:var(--signal)}
+
+.empty{text-align:center;padding:44px 20px;color:var(--ink-soft)}
+.empty strong{display:block;font-size:16px;color:var(--ink);margin-bottom:5px}
+
+/* ---------- schedule ---------- */
+.classrow{border:1px solid var(--rule);border-radius:var(--r);background:var(--surface);margin-bottom:10px;overflow:hidden}
+.classrow .head{display:flex;align-items:center;gap:10px;padding:11px 13px;flex-wrap:wrap}
+.classrow .head .swatch{width:13px;height:13px;border-radius:3px;flex:none}
+.classrow .head .nm{font-weight:800;font-size:14.5px;letter-spacing:-.01em}
+.classrow .head .rm{font-size:12px;color:var(--ink-faint)}
+.classrow .head .sp{flex:1}
+.blocks{padding:0 13px 12px;display:flex;gap:6px;flex-wrap:wrap}
+.pill{
+  font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--rule-soft);
+  border-radius:999px;padding:4px 6px 4px 10px;display:flex;align-items:center;gap:6px;
+}
+.pill button{border:0;background:none;color:var(--ink-faint);font-size:14px;line-height:1;padding:0 3px}
+.pill button:hover{color:#B4123F}
+.addblock{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;padding:0 13px 13px}
+.addblock select,.addblock input{padding:5px 7px;font-size:12px}
+.addblock .tight{flex:0 0 auto}
+
+.week{display:grid;grid-template-columns:44px repeat(7,1fr);gap:3px;margin-top:12px}
+.week .dh{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);text-align:center;padding-bottom:5px}
+.week .col{position:relative;background:var(--surface-2);border-radius:5px;min-height:340px;overflow:hidden}
+.week .col.today{box-shadow:inset 0 0 0 1.5px var(--signal)}
+.week .hours{position:relative}
+.week .hours span{position:absolute;right:6px;transform:translateY(-50%);font-family:var(--mono);font-size:9.5px;color:var(--ink-faint)}
+.wblk{position:absolute;left:2px;right:2px;border-radius:4px;padding:3px 4px;overflow:hidden;color:#fff;font-size:9.5px;font-weight:700;line-height:1.15}
+.wblk.brk{background:var(--surface)!important;color:var(--ink-faint);border:1px dashed var(--rule);
+  background-image:repeating-linear-gradient(45deg,var(--rule-soft) 0 5px,transparent 5px 10px)}
+
+.toast{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(90px);
+  background:var(--ink);color:#fff;border-radius:999px;padding:10px 20px;font-size:13px;font-weight:600;
+  box-shadow:0 10px 30px -8px rgba(22,32,43,.5);z-index:99;opacity:0;transition:.24s;pointer-events:none;
+}
+.toast.show{transform:translateX(-50%);opacity:1}
+.note-inline{font-size:12px;color:var(--ink-soft);margin:10px 0 0}
+
+@media (max-width:640px){
+  .brand h1{font-size:24px}
+  .week{grid-template-columns:34px repeat(7,1fr);font-size:9px}
+  .week .col{min-height:250px}
+  .wrap{padding:14px 12px 60px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= HEADER ================= -->
+  <header class="top">
+    <div class="brand">
+      <h1>Period<span class="dot"></span></h1>
+      <p>Notes and photos file themselves by the clock.</p>
+    </div>
+    <div class="clockbox">
+      <div>
+        <div class="eyebrow" id="nowDay">—</div>
+        <div class="now" id="nowTime">--:--</div>
+      </div>
+      <button class="chip-btn" id="simToggle" aria-pressed="false">Set a time</button>
+      <div class="simfields" id="simFields">
+        <select id="simDay" aria-label="Simulated day"></select>
+        <input type="time" id="simTime" aria-label="Simulated time" value="10:20">
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ SIGNATURE: TODAY'S RIBBON ============ -->
+  <section class="ribbon-card">
+    <div class="ribbon-head">
+      <span class="eyebrow">Today on the timetable</span>
+      <span class="eyebrow" id="ribbonRange">—</span>
+    </div>
+    <div class="ribbon" id="ribbon"></div>
+    <div class="ribbon-axis" id="ribbonAxis"></div>
+    <div class="verdict" id="verdict"></div>
+  </section>
+
+  <!-- ================= TABS ================= -->
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-capture"  aria-selected="true"  aria-controls="p-capture">Capture</button>
+    <button class="tab" role="tab" id="tab-notebook" aria-selected="false" aria-controls="p-notebook">Notebook</button>
+    <button class="tab" role="tab" id="tab-schedule" aria-selected="false" aria-controls="p-schedule">Schedule</button>
+  </div>
+
+  <!-- ================= CAPTURE ================= -->
+  <section class="panel" id="p-capture" role="tabpanel" aria-labelledby="tab-capture">
+    <div class="card">
+      <div class="modes" role="group" aria-label="Capture type">
+        <button data-mode="text"  aria-pressed="true">Write</button>
+        <button data-mode="draw"  aria-pressed="false">Draw</button>
+        <button data-mode="photo" aria-pressed="false">Photo</button>
+      </div>
+
+      <label class="f"><span>Title</span>
+        <input type="text" id="capTitle" placeholder="Untitled — we'll name it after the class">
+      </label>
+
+      <!-- write -->
+      <div id="m-text">
+        <label class="f"><span>Note</span>
+          <textarea id="capText" placeholder="Type here. On an iPad this is where Scribble would let you handwrite straight into the field."></textarea>
+        </label>
+      </div>
+
+      <!-- draw -->
+      <div id="m-draw" hidden>
+        <div class="pentools">
+          <div class="inks" id="inks" role="group" aria-label="Ink colour"></div>
+          <input type="range" id="penSize" min="1" max="18" value="4" aria-label="Pen size">
+          <button class="chip-btn" id="eraser" aria-pressed="false">Eraser</button>
+          <button class="btn ghost sm" id="undo">Undo</button>
+          <button class="btn ghost sm" id="clearPad">Clear</button>
+        </div>
+        <canvas id="pad" width="1000" height="640" aria-label="Drawing area"></canvas>
+        <p class="note-inline">Pressure-sensitive: the harder an Apple Pencil presses, the thicker the stroke. In a real iPad build this canvas is PencilKit instead.</p>
+      </div>
+
+      <!-- photo -->
+      <div id="m-photo" hidden>
+        <div class="dropzone" id="dropzone">
+          <span class="eyebrow">Board, slide, or handout</span>
+          <p>Take a photo or choose one from your library. It gets resized before it's stored.</p>
+          <button class="btn ghost" id="pickBtn">Choose a photo</button>
+          <input type="file" id="pickFile" accept="image/*" capture="environment" hidden>
+        </div>
+        <div id="shotWrap" hidden style="margin-top:12px">
+          <img id="shotPrev" alt="Photo preview">
+          <button class="btn ghost sm" id="reshoot" style="margin-top:9px">Replace photo</button>
+        </div>
+      </div>
+
+      <!-- filing bar -->
+      <div class="filebar">
+        <div class="grow">
+          <span class="eyebrow">Filing to</span>
+          <div class="dest" id="capDest">—</div>
+          <div class="why" id="capWhy"></div>
+        </div>
+        <label class="f tight" style="margin:0;flex:0 1 190px">
+          <span>Override</span>
+          <select id="capOverride"></select>
+        </label>
+        <button class="btn sig tight" id="saveBtn">Save to notebook</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= NOTEBOOK ================= -->
+  <section class="panel" id="p-notebook" role="tabpanel" aria-labelledby="tab-notebook" hidden>
+    <div class="card" style="padding:14px 16px">
+      <input type="text" id="search" placeholder="Search titles and note text…">
+      <div class="filters" id="filters"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost sm" id="exportBtn">Export everything as JSON</button>
+        <button class="btn danger sm" id="wipeBtn">Delete all entries</button>
+      </div>
+    </div>
+    <div id="notebook"></div>
+  </section>
+
+  <!-- ================= SCHEDULE ================= -->
+  <section class="panel" id="p-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden>
+    <div class="card">
+      <span class="eyebrow">Add a class</span>
+      <div class="row">
+        <label class="f" style="margin:0"><span>Name</span><input type="text" id="clsName" placeholder="Organic Chemistry"></label>
+        <label class="f" style="margin:0"><span>Room</span><input type="text" id="clsRoom" placeholder="B-204"></label>
+        <div class="tight"><button class="btn" id="addClass">Add class</button></div>
+      </div>
+      <div style="margin-top:12px"><span class="eyebrow">Colour</span><div class="inks" id="clsColors" style="margin-top:6px"></div></div>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Classes and their hours</span>
+      <div id="classList"></div>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Breaks</span>
+      <p class="note-inline" style="margin:0 0 12px">Anything captured during a break lands in Breaks instead of a class, so lunch doodles don't pollute your Physics notes.</p>
+      <div class="row">
+        <label class="f" style="margin:0"><span>Name</span><input type="text" id="brkName" placeholder="Lunch"></label>
+        <label class="f" style="margin:0"><span>Day</span><select id="brkDay"></select></label>
+        <label class="f" style="margin:0"><span>From</span><input type="time" id="brkStart" value="12:30"></label>
+        <label class="f" style="margin:0"><span>To</span><input type="time" id="brkEnd" value="13:15"></label>
+        <div class="tight"><button class="btn" id="addBreak">Add break</button></div>
+      </div>
+      <div class="blocks" id="breakList" style="padding:12px 0 0"></div>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">The week</span>
+      <div class="week" id="week"></div>
+      <p class="note-inline">
+        <button class="btn ghost sm" id="reseed">Reset to the sample timetable</button>
+      </p>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ================================================================
+   PERIOD — prototype
+   ----------------------------------------------------------------
+   The whole idea in one function: resolve(date) -> where it goes.
+   Everything else is UI around that.
+   ================================================================ */
+
+const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const DAYS3 = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const PALETTE = ['#F0A202','#009B8E','#7A4FE0','#2D6FE0','#F2544B','#4A9E2F','#C2591D','#5A6B7A'];
+/* magenta (--signal) is deliberately NOT in the palette — it means "now" and nothing else */
+
+const uid = () => Math.random().toString(36).slice(2,9);
+const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+const fromMin = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const dayIdx = d => (d.getDay()+6)%7;                    // 0 = Monday
+const minOf  = d => d.getHours()*60+d.getMinutes();
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------------- storage shim ----------------
+   Uses the artifact key/value store when it exists, otherwise keeps
+   state in memory. If you run this file on your own machine, swap the
+   two bodies below for localStorage and it will persist there.       */
+const mem = {};
+const KEY = 'period:state';
+const store = {
+  async get(){ try{ if(window.storage){ const r = await window.storage.get(KEY,false); return r? JSON.parse(r.value): null; } }catch(e){} return mem[KEY] ?? null; },
+  async set(v){ try{ if(window.storage){ await window.storage.set(KEY, JSON.stringify(v), false); return; } }catch(e){} mem[KEY] = v; }
+};
+
+/* ---------------- sample timetable ---------------- */
+function seed(){
+  const c = (name,room,color,blocks)=>({id:uid(),name,room,color,blocks:blocks.map(b=>({id:uid(),...b}))});
+  return {
+    classes:[
+      c('Calculus II','A-118',PALETTE[3],[{day:0,start:'08:00',end:'09:30'},{day:2,start:'08:00',end:'09:30'},{day:4,start:'08:00',end:'09:30'}]),
+      c('Physics','Lab 2',PALETTE[1],[{day:0,start:'09:45',end:'11:15'},{day:3,start:'09:45',end:'11:15'}]),
+      c('World History','C-31',PALETTE[0],[{day:1,start:'10:00',end:'11:30'},{day:3,start:'13:15',end:'14:45'}]),
+      c('Studio Art','Annex',PALETTE[2],[{day:1,start:'13:15',end:'15:00'},{day:4,start:'11:30',end:'13:00'}]),
+    ],
+    breaks:[
+      {id:uid(),name:'Lunch',day:0,start:'12:30',end:'13:15'},
+      {id:uid(),name:'Lunch',day:1,start:'11:30',end:'12:15'},
+      {id:uid(),name:'Lunch',day:2,start:'12:30',end:'13:15'},
+      {id:uid(),name:'Lunch',day:3,start:'12:00',end:'13:00'},
+      {id:uid(),name:'Free period',day:2,start:'10:00',end:'11:00'},
+    ],
+    items:[]
+  };
+}
+let S = seed();
+
+/* ---------------- the clock ---------------- */
+let sim = null;   // {day, min} when the user pins a time
+const now = () => {
+  if(!sim) return new Date();
+  const d = new Date();
+  const shift = sim.day - dayIdx(d);
+  d.setDate(d.getDate()+shift);
+  d.setHours(Math.floor(sim.min/60), sim.min%60, 0, 0);
+  return d;
+};
+
+/* ================================================================
+   THE CORE: given a moment, where does a capture belong?
+   Classes win over breaks; nothing matching means Unfiled.
+   ================================================================ */
+function resolve(date){
+  const d = dayIdx(date), m = minOf(date);
+  for(const c of S.classes)
+    for(const b of c.blocks)
+      if(b.day===d && m>=toMin(b.start) && m<toMin(b.end))
+        return {kind:'class', classId:c.id, name:c.name, color:c.color, block:b};
+  for(const b of S.breaks)
+    if(b.day===d && m>=toMin(b.start) && m<toMin(b.end))
+      return {kind:'break', classId:null, name:b.name, color:'var(--ink-faint)', block:b};
+  return {kind:'none', classId:null, name:'Unfiled', color:'var(--ink-faint)', block:null};
+}
+const classById = id => S.classes.find(c=>c.id===id);
+
+/* ================================================================
+   RIBBON — today's timetable with a live playhead
+   ================================================================ */
+function drawRibbon(){
+  const d = now(), di = dayIdx(d), m = minOf(d);
+  const rib = document.getElementById('ribbon');
+  const segs = [];
+  S.classes.forEach(c=>c.blocks.filter(b=>b.day===di)
+    .forEach(b=>segs.push({name:c.name,color:c.color,s:toMin(b.start),e:toMin(b.end),brk:false})));
+  S.breaks.filter(b=>b.day===di)
+    .forEach(b=>segs.push({name:b.name,color:null,s:toMin(b.start),e:toMin(b.end),brk:true}));
+
+  document.getElementById('nowDay').textContent = DAYS[di] + (sim ? ' · pinned' : '');
+  document.getElementById('nowTime').textContent = fromMin(m);
+
+  if(!segs.length){
+    rib.innerHTML = '<div style="display:grid;place-items:center;height:100%;font-size:12.5px;color:var(--ink-faint)">Nothing scheduled on '+DAYS[di]+'</div>';
+    document.getElementById('ribbonAxis').innerHTML = '';
+    document.getElementById('ribbonRange').textContent = '';
+  } else {
+    const lo = Math.min(...segs.map(s=>s.s), m) - 25;
+    const hi = Math.max(...segs.map(s=>s.e), m) + 25;
+    const pct = v => ((v-lo)/(hi-lo))*100;
+    rib.innerHTML = segs.sort((a,b)=>a.s-b.s).map(s=>`
+      <div class="blk${s.brk?' brk':''}" style="left:${pct(s.s)}%;width:${pct(s.e)-pct(s.s)}%;${s.brk?'':'background:'+s.color}">
+        <div class="n">${esc(s.name)}</div>
+        <div class="t">${fromMin(s.s)}–${fromMin(s.e)}</div>
+      </div>`).join('')
+      + `<div class="playhead" style="left:${pct(m)}%"></div>`;
+    document.getElementById('ribbonAxis').innerHTML = `<span class="mono">${fromMin(lo)}</span><span class="mono">${fromMin(hi)}</span>`;
+    document.getElementById('ribbonRange').textContent = segs.length+' block'+(segs.length>1?'s':'');
+  }
+
+  const r = resolve(d);
+  const v = document.getElementById('verdict');
+  if(r.kind==='class'){
+    const left = toMin(r.block.end)-m;
+    v.innerHTML = `<span class="swatch" style="background:${r.color}"></span>
+      <span>You're in <strong>${esc(r.name)}</strong></span>
+      <span class="sub mono">${left} min left · ends ${r.block.end}</span>`;
+  } else if(r.kind==='break'){
+    v.innerHTML = `<span class="swatch" style="background:var(--rule)"></span>
+      <span><strong>${esc(r.name)}</strong> — captures go to Breaks</span>`;
+  } else {
+    v.innerHTML = `<span class="swatch" style="background:var(--rule)"></span>
+      <span><strong>No class right now</strong></span>
+      <span class="sub">Anything you save lands in Unfiled until you move it.</span>`;
+  }
+  updateDest();
+}
+
+/* ================================================================
+   CAPTURE
+   ================================================================ */
+let mode = 'text';
+let shot = null;        // photo dataURL
+
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
+  mode = b.dataset.mode;
+  document.querySelectorAll('.modes button').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  document.getElementById('m-text').hidden  = mode!=='text';
+  document.getElementById('m-draw').hidden  = mode!=='draw';
+  document.getElementById('m-photo').hidden = mode!=='photo';
+});
+
+function updateDest(){
+  const sel = document.getElementById('capOverride');
+  const keep = sel.value;
+  sel.innerHTML = '<option value="auto">Auto — use the clock</option>'
+    + S.classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')
+    + '<option value="break">Breaks</option><option value="none">Unfiled</option>';
+  sel.value = keep && [...sel.options].some(o=>o.value===keep) ? keep : 'auto';
+
+  const r = resolve(now());
+  const dest = document.getElementById('capDest');
+  const why  = document.getElementById('capWhy');
+  if(sel.value === 'auto'){
+    dest.innerHTML = `<span class="swatch" style="background:${r.kind==='class'?r.color:'var(--rule)'}"></span>${esc(r.name)}`;
+    why.textContent = r.block
+      ? `${DAYS[dayIdx(now())]} ${fromMin(minOf(now()))} falls inside ${r.block.start}–${r.block.end}.`
+      : `No block covers ${DAYS[dayIdx(now())]} ${fromMin(minOf(now()))}.`;
+  } else {
+    const c = classById(sel.value);
+    dest.innerHTML = `<span class="swatch" style="background:${c?c.color:'var(--rule)'}"></span>${c?esc(c.name):(sel.value==='break'?'Breaks':'Unfiled')}`;
+    why.textContent = 'Manually chosen — the clock is ignored for this one.';
+  }
+}
+document.getElementById('capOverride').onchange = updateDest;
+
+/* ---------------- drawing pad ---------------- */
+const pad = document.getElementById('pad'), ctx = pad.getContext('2d');
+let strokes = [], cur = null, penColor = '#16202B', erasing = false;
+
+['#16202B','#2D6FE0','#E0006C','#F0A202','#009B8E'].forEach((c,i)=>{
+  const b = document.createElement('button');
+  b.className='ink'; b.style.background=c; b.setAttribute('aria-pressed', i===0); b.setAttribute('aria-label','Ink '+c);
+  b.onclick = ()=>{ penColor=c; erasing=false;
+    document.getElementById('eraser').setAttribute('aria-pressed','false');
+    document.querySelectorAll('#inks .ink').forEach(x=>x.setAttribute('aria-pressed', x===b)); };
+  document.getElementById('inks').appendChild(b);
+});
+document.getElementById('eraser').onclick = e=>{
+  erasing = !erasing; e.currentTarget.setAttribute('aria-pressed', erasing);
+};
+const padPt = e => { const r = pad.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*(pad.width/r.width), y:(e.clientY-r.top)*(pad.height/r.height),
+           p: e.pressure>0 ? e.pressure : 0.5 }; };
+
+function repaint(){
+  ctx.clearRect(0,0,pad.width,pad.height);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  for(const s of strokes){
+    ctx.globalCompositeOperation = s.eraser?'destination-out':'source-over';
+    ctx.strokeStyle = s.color;
+    for(let i=1;i<s.pts.length;i++){
+      const a=s.pts[i-1], b=s.pts[i];
+      ctx.lineWidth = s.size * (s.eraser ? 3 : (0.35 + 0.65*b.p));
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    }
+  }
+  ctx.globalCompositeOperation='source-over';
+}
+pad.addEventListener('pointerdown', e=>{
+  pad.setPointerCapture(e.pointerId);
+  cur = {color:penColor, size:+document.getElementById('penSize').value, eraser:erasing, pts:[padPt(e)]};
+  strokes.push(cur);
+});
+pad.addEventListener('pointermove', e=>{ if(!cur) return; cur.pts.push(padPt(e)); repaint(); });
+addEventListener('pointerup', ()=>{ cur=null; });
+document.getElementById('undo').onclick = ()=>{ strokes.pop(); repaint(); };
+document.getElementById('clearPad').onclick = ()=>{ strokes=[]; repaint(); };
+
+/* ---------------- photo ---------------- */
+document.getElementById('pickBtn').onclick = ()=>document.getElementById('pickFile').click();
+document.getElementById('reshoot').onclick = ()=>document.getElementById('pickFile').click();
+document.getElementById('pickFile').onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const fr = new FileReader();
+  fr.onload = () => shrink(fr.result, 1200).then(url=>{
+    shot = url;
+    document.getElementById('shotPrev').src = url;
+    document.getElementById('shotWrap').hidden = false;
+    document.getElementById('dropzone').hidden = true;
+  });
+  fr.readAsDataURL(f);
+};
+function shrink(dataUrl, max){
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const sc = Math.min(1, max/Math.max(img.width,img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      res(cv.toDataURL('image/jpeg',0.72));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/* ---------------- save ---------------- */
+document.getElementById('saveBtn').onclick = async ()=>{
+  const when = now();
+  const ov = document.getElementById('capOverride').value;
+  const auto = resolve(when);
+
+  let classId=null, bucket='none';
+  if(ov==='auto'){ classId=auto.classId; bucket=auto.kind==='class'?'class':auto.kind==='break'?'break':'none'; }
+  else if(ov==='break'){ bucket='break'; }
+  else if(ov==='none'){ bucket='none'; }
+  else { classId=ov; bucket='class'; }
+
+  const item = {
+    id:uid(), kind:mode, createdAt:when.getTime(),
+    day:dayIdx(when), min:minOf(when),
+    title:document.getElementById('capTitle').value.trim(),
+    text:'', image:null, classId, bucket,
+    overridden: ov!=='auto',
+    autoLabel: auto.name
+  };
+
+  if(mode==='text'){
+    item.text = document.getElementById('capText').value.trim();
+    if(!item.text && !item.title) return toast('Nothing to save yet — write something first.');
+  }
+  if(mode==='draw'){
+    if(!strokes.length) return toast('The pad is empty — draw something first.');
+    item.image = pad.toDataURL('image/png');
+  }
+  if(mode==='photo'){
+    if(!shot) return toast('No photo chosen yet.');
+    item.image = shot;
+  }
+  if(!item.title){
+    const c = classById(classId);
+    item.title = (c ? c.name : bucket==='break' ? 'Break' : 'Unfiled') + ' · ' + fromMin(item.min);
+  }
+
+  S.items.unshift(item);
+  await persist();
+  toast('Saved to ' + (classById(classId)?.name || (bucket==='break'?'Breaks':'Unfiled')));
+
+  document.getElementById('capTitle').value=''; document.getElementById('capText').value='';
+  strokes=[]; repaint(); shot=null;
+  document.getElementById('shotWrap').hidden=true; document.getElementById('dropzone').hidden=false;
+  document.getElementById('pickFile').value='';
+  drawNotebook();
+};
+
+/* ================================================================
+   NOTEBOOK
+   ================================================================ */
+let filter = 'all';
+function drawFilters(){
+  const f = document.getElementById('filters');
+  const mk = (v,label,color) => `<button class="fchip" data-f="${v}" aria-pressed="${filter===v}">
+      ${color?`<span class="swatch" style="background:${color}"></span>`:''}${esc(label)}</button>`;
+  f.innerHTML = mk('all','Everything','') + S.classes.map(c=>mk(c.id,c.name,c.color)).join('')
+    + mk('break','Breaks','') + mk('none','Unfiled','');
+  f.querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ filter=b.dataset.f; drawFilters(); drawNotebook(); });
+}
+function drawNotebook(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const box = document.getElementById('notebook');
+  let items = S.items.filter(i=>{
+    if(filter!=='all'){
+      if(filter==='break' && i.bucket!=='break') return false;
+      if(filter==='none'  && i.bucket!=='none')  return false;
+      if(filter!=='break' && filter!=='none' && i.classId!==filter) return false;
+    }
+    return !q || (i.title+' '+i.text).toLowerCase().includes(q);
+  });
+  if(!items.length){
+    box.innerHTML = `<div class="empty"><strong>Nothing here yet</strong>
+      Capture a note, a sketch, or a photo and it will show up under whichever class was running at that moment.</div>`;
+    return;
+  }
+  const buckets = [...S.classes.map(c=>({key:c.id,label:c.name,color:c.color})),
+                   {key:'break',label:'Breaks',color:'var(--rule)'},
+                   {key:'none',label:'Unfiled',color:'var(--rule)'}];
+  box.innerHTML = buckets.map(b=>{
+    const list = items.filter(i => b.key==='break' ? i.bucket==='break'
+                                : b.key==='none'  ? i.bucket==='none'
+                                : i.classId===b.key);
+    if(!list.length) return '';
+    return `<div class="group-h"><span class="swatch" style="background:${b.color}"></span>
+        <h3>${esc(b.label)}</h3><span class="count">${list.length}</span><hr></div>
+      <div class="grid">${list.map(i=>card(i,b.color)).join('')}</div>`;
+  }).join('');
+
+  box.querySelectorAll('select[data-move]').forEach(s=>s.onchange=async e=>{
+    const it = S.items.find(x=>x.id===e.target.dataset.move);
+    const v = e.target.value;
+    it.classId = (v==='break'||v==='none') ? null : v;
+    it.bucket  = (v==='break'||v==='none') ? v : 'class';
+    it.overridden = true;
+    await persist(); drawNotebook();
+  });
+  box.querySelectorAll('button[data-del]').forEach(b=>b.onclick=async e=>{
+    S.items = S.items.filter(x=>x.id!==e.target.dataset.del);
+    await persist(); drawNotebook();
+  });
+}
+function card(i,color){
+  const d = new Date(i.createdAt);
+  const opts = S.classes.map(c=>`<option value="${c.id}" ${i.classId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')
+    + `<option value="break" ${i.bucket==='break'?'selected':''}>Breaks</option>`
+    + `<option value="none"  ${i.bucket==='none' ?'selected':''}>Unfiled</option>`;
+  return `<article class="item">
+    <div class="stripe" style="background:${color}"></div>
+    ${i.image?`<img src="${i.image}" alt="">`:''}
+    <div class="body">
+      <h4>${esc(i.title)}</h4>
+      ${i.text?`<p class="excerpt">${esc(i.text)}</p>`:''}
+    </div>
+    <div class="meta">
+      <span class="mono">${DAYS3[i.day]} ${fromMin(i.min)}</span>
+      <span class="tag ${i.overridden?'moved':''}">${i.overridden?'moved by hand':'by clock'}</span>
+      <select data-move="${i.id}" aria-label="Move entry">${opts}</select>
+      <button class="btn danger sm" data-del="${i.id}">Delete</button>
+    </div>
+  </article>`;
+}
+document.getElementById('search').oninput = drawNotebook;
+document.getElementById('wipeBtn').onclick = async ()=>{ S.items=[]; await persist(); drawNotebook(); toast('All entries deleted'); };
+document.getElementById('exportBtn').onclick = ()=>{
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
+  a.download = 'period-export.json'; a.click();
+};
+
+/* ================================================================
+   SCHEDULE
+   ================================================================ */
+let newColor = PALETTE[0];
+PALETTE.forEach((c,i)=>{
+  const b=document.createElement('button');
+  b.className='ink'; b.style.background=c; b.setAttribute('aria-pressed', i===0); b.setAttribute('aria-label','Colour '+c);
+  b.onclick=()=>{ newColor=c; document.querySelectorAll('#clsColors .ink').forEach(x=>x.setAttribute('aria-pressed',x===b)); };
+  document.getElementById('clsColors').appendChild(b);
+});
+DAYS.forEach((d,i)=>{
+  document.getElementById('brkDay').insertAdjacentHTML('beforeend',`<option value="${i}">${d}</option>`);
+  document.getElementById('simDay').insertAdjacentHTML('beforeend',`<option value="${i}">${DAYS3[i]}</option>`);
+});
+
+document.getElementById('addClass').onclick = async ()=>{
+  const n = document.getElementById('clsName').value.trim();
+  if(!n) return toast('Give the class a name first.');
+  S.classes.push({id:uid(),name:n,room:document.getElementById('clsRoom').value.trim(),color:newColor,blocks:[]});
+  document.getElementById('clsName').value=''; document.getElementById('clsRoom').value='';
+  await persist(); drawAll();
+};
+document.getElementById('addBreak').onclick = async ()=>{
+  const n = document.getElementById('brkName').value.trim() || 'Break';
+  const s = document.getElementById('brkStart').value, e = document.getElementById('brkEnd').value;
+  if(toMin(e)<=toMin(s)) return toast('The end time has to come after the start.');
+  S.breaks.push({id:uid(),name:n,day:+document.getElementById('brkDay').value,start:s,end:e});
+  await persist(); drawAll();
+};
+
+function drawClasses(){
+  const box = document.getElementById('classList');
+  if(!S.classes.length){ box.innerHTML = '<div class="empty"><strong>No classes yet</strong>Add one above, then give it hours.</div>'; return; }
+  box.innerHTML = S.classes.map(c=>`
+    <div class="classrow">
+      <div class="head">
+        <span class="swatch" style="background:${c.color}"></span>
+        <span class="nm">${esc(c.name)}</span>
+        ${c.room?`<span class="rm">${esc(c.room)}</span>`:''}
+        <span class="sp"></span>
+        <button class="btn danger sm" data-delcls="${c.id}">Remove class</button>
+      </div>
+      <div class="blocks">
+        ${c.blocks.length ? c.blocks.slice().sort((a,b)=>a.day-b.day||toMin(a.start)-toMin(b.start))
+            .map(b=>`<span class="pill">${DAYS3[b.day]} ${b.start}–${b.end}
+              <button data-delblk="${b.id}" data-cls="${c.id}" aria-label="Remove this hour">×</button></span>`).join('')
+          : '<span class="rm" style="font-size:12px;color:var(--ink-faint)">No hours set — nothing will file here automatically.</span>'}
+      </div>
+      <div class="addblock">
+        <select data-day="${c.id}">${DAYS.map((d,i)=>`<option value="${i}">${DAYS3[i]}</option>`).join('')}</select>
+        <input type="time" data-start="${c.id}" value="09:00">
+        <input type="time" data-end="${c.id}" value="10:30">
+        <button class="btn ghost sm tight" data-addblk="${c.id}">Add hours</button>
+      </div>
+    </div>`).join('');
+
+  box.querySelectorAll('[data-addblk]').forEach(b=>b.onclick=async e=>{
+    const id = e.target.dataset.addblk, c = classById(id);
+    const s = box.querySelector(`[data-start="${id}"]`).value, en = box.querySelector(`[data-end="${id}"]`).value;
+    if(toMin(en)<=toMin(s)) return toast('The end time has to come after the start.');
+    c.blocks.push({id:uid(), day:+box.querySelector(`[data-day="${id}"]`).value, start:s, end:en});
+    await persist(); drawAll();
+  });
+  box.querySelectorAll('[data-delblk]').forEach(b=>b.onclick=async e=>{
+    const c = classById(e.target.dataset.cls);
+    c.blocks = c.blocks.filter(x=>x.id!==e.target.dataset.delblk);
+    await persist(); drawAll();
+  });
+  box.querySelectorAll('[data-delcls]').forEach(b=>b.onclick=async e=>{
+    const id = e.target.dataset.delcls;
+    S.classes = S.classes.filter(c=>c.id!==id);
+    S.items.forEach(i=>{ if(i.classId===id){ i.classId=null; i.bucket='none'; } });
+    await persist(); drawAll(); drawNotebook();
+  });
+
+  const bl = document.getElementById('breakList');
+  bl.innerHTML = S.breaks.length ? S.breaks.slice().sort((a,b)=>a.day-b.day||toMin(a.start)-toMin(b.start))
+    .map(b=>`<span class="pill">${DAYS3[b.day]} ${b.start}–${b.end} · ${esc(b.name)}
+      <button data-delbrk="${b.id}" aria-label="Remove break">×</button></span>`).join('')
+    : '<span style="font-size:12px;color:var(--ink-faint)">No breaks yet.</span>';
+  bl.querySelectorAll('[data-delbrk]').forEach(b=>b.onclick=async e=>{
+    S.breaks = S.breaks.filter(x=>x.id!==e.target.dataset.delbrk);
+    await persist(); drawAll();
+  });
+}
+
+function drawWeek(){
+  const all = [];
+  S.classes.forEach(c=>c.blocks.forEach(b=>all.push({...b,name:c.name,color:c.color,brk:false})));
+  S.breaks.forEach(b=>all.push({...b,brk:true}));
+  const wk = document.getElementById('week');
+  if(!all.length){ wk.innerHTML = '<p style="grid-column:1/-1;color:var(--ink-faint);font-size:13px">Add some hours and the week will draw itself.</p>'; return; }
+  const lo = Math.floor(Math.min(...all.map(b=>toMin(b.start)))/60)*60;
+  const hi = Math.ceil(Math.max(...all.map(b=>toMin(b.end)))/60)*60;
+  const span = hi-lo, today = dayIdx(now());
+  const y = v => ((v-lo)/span)*100;
+
+  let hours = '';
+  for(let h=lo; h<=hi; h+=60) hours += `<span style="top:${y(h)}%">${fromMin(h)}</span>`;
+
+  wk.innerHTML = '<div></div>' + DAYS3.map(d=>`<div class="dh">${d}</div>`).join('')
+    + `<div class="hours" style="min-height:340px">${hours}</div>`
+    + DAYS3.map((_,i)=>`<div class="col${i===today?' today':''}">
+        ${all.filter(b=>b.day===i).map(b=>`
+          <div class="wblk${b.brk?' brk':''}" style="top:${y(toMin(b.start))}%;height:${y(toMin(b.end))-y(toMin(b.start))}%;${b.brk?'':'background:'+b.color}">
+            ${esc(b.name)}</div>`).join('')}
+      </div>`).join('');
+}
+
+document.getElementById('reseed').onclick = async ()=>{
+  const keep = S.items; S = seed(); S.items = keep;
+  await persist(); drawAll(); drawNotebook(); toast('Sample timetable restored');
+};
+
+/* ================================================================
+   SHELL
+   ================================================================ */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>{
+    const on = x===t;
+    x.setAttribute('aria-selected', on);
+    document.getElementById(x.getAttribute('aria-controls')).hidden = !on;
+  });
+});
+
+const simToggle = document.getElementById('simToggle');
+simToggle.onclick = ()=>{
+  const on = simToggle.getAttribute('aria-pressed')!=='true';
+  simToggle.setAttribute('aria-pressed', on);
+  simToggle.textContent = on ? 'Back to live' : 'Set a time';
+  document.getElementById('simFields').classList.toggle('on', on);
+  if(on){
+    document.getElementById('simDay').value = dayIdx(new Date());
+    readSim();
+  } else { sim = null; }
+  drawAll();
+};
+function readSim(){ sim = {day:+document.getElementById('simDay').value, min:toMin(document.getElementById('simTime').value)}; }
+document.getElementById('simDay').onchange = ()=>{ readSim(); drawAll(); };
+document.getElementById('simTime').oninput  = ()=>{ readSim(); drawAll(); };
+
+let toastT;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+async function persist(){
+  try{ await store.set(S); }
+  catch(e){ toast('Could not save — storage may be full.'); }
+}
+function drawAll(){ drawRibbon(); drawClasses(); drawWeek(); drawFilters(); }
+
+(async function init(){
+  const saved = await store.get();
+  if(saved && saved.classes) S = saved;
+  drawAll(); drawNotebook(); repaint();
+  setInterval(()=>{ if(!sim) drawRibbon(); }, 20000);
+})();
+</script>
+</body>
+</html>
